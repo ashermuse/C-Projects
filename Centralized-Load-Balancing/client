@@ -1,0 +1,89 @@
+#include <stdio.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+
+long double getCPUUtil() {
+  long double a[4], b[4]; //Used for CPU util
+  FILE *fp; //Used for CPU util
+  fp = fopen("/proc/stat","r"); //Opens location of CPU statistics
+  fscanf(fp,"%*s %Lf %Lf %Lf %Lf",&a[0],&a[1],&a[2],&a[3]);
+  fclose(fp);
+  sleep(1);
+  fp = fopen("/proc/stat","r"); //Opens location of CPU statistics
+  fscanf(fp,"%*s %Lf %Lf %Lf %Lf",&b[0],&b[1],&b[2],&b[3]);
+  fclose(fp);
+  return ((b[0]+b[1]+b[2]) - (a[0]+a[1]+a[2])) / ((b[0]+b[1]+b[2]+b[3]) - (a[0]+a[1]+a[2]+a[3]));
+}
+
+int main(int argc, char *argv[])
+{
+  // This is the message that will be sent.
+  char *message = (char*)malloc(sizeof(typeof(char))*128);
+  long double CPUUtil;
+  int nodeID, port;
+  int sock = 0;
+  struct sockaddr_in serv_addr;
+  char buffer[1024] = {0};
+
+  // Handle port selection
+  if (argc < 2) {
+    printf("Port not specified. Please input desired port: ");
+    scanf("%d", &port);
+  }
+  else { //If no port is entered upon running ./client
+    port = atoi(argv[1]);
+    while(port == 0) {
+      printf("\nThat is not a valid port. Please input a valid port: ");
+      scanf("%d", &port);
+    }
+  }
+
+  // Connect to the server.
+  if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+  {
+    printf("\n Socket creation error \n");
+    return -1;
+  }
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_port = htons(port);
+  // Convert IPv4 and IPv6 addresses from text to binary form
+  if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0)
+  {
+    printf("\nInvalid address/ Address not supported \n");
+    return -1;
+  }
+  if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+  {
+    printf("\nConnection Failed \n");
+    return -1;
+  }
+
+  // When connection is established, server sends nodeID.
+  read( sock , buffer, 1024);
+  nodeID = atoi(buffer);
+  printf("Connection established. ID is: %d\n",nodeID);
+
+  // If the message is "Q", quit the program.
+  while(buffer[0] != '!' || buffer[1] != 'Q') {
+
+    // Wait to Receive command from server
+    read( sock , buffer, 1024);
+
+    if (buffer[0] != '!') {
+        printf("Executing: %s", buffer);
+        // This is where the execution of the file would be.
+        buffer[0] = '!';
+        buffer[1] = ' ';
+    }
+    else if (buffer[1] == 'C') { // If the server requests the CPU utilization, send the CPU utilization.
+      CPUUtil = getCPUUtil();
+  	  sprintf(message, "!C %Lf", CPUUtil);
+      write(sock , message , strlen(message));
+    }
+  }
+  free(message);
+	return 0;
+}
