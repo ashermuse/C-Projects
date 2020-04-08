@@ -1,0 +1,1 @@
+Centralized load balancing system built in C that checks CPU usage on slave machines and reports data back to master to allow for CPU optimization across network.
