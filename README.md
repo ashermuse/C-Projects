@@ -1,2 +1,2 @@
 # C-Projects
-A collection of projects I have developed in C.
+Archive of C Projects made when in undergrad.
